@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Real-time 3D Satellite Tracker. View active satellites orbiting the Earth and see which ones are passing directly above your location right now.">
+    <title>AETHER // 3D Satellite & Radar Tracker</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- CSS Style -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- CDN Libraries -->
+    <!-- Three.js (r128) -->
+    <script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+    <!-- Globe.gl (v2.32) -->
+    <script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
+    <!-- Satellite.js (v4.0) -->
+    <script src="https://unpkg.com/satellite.js@4.0.0/dist/satellite.min.js"></script>
+</head>
+<body>
+    <!-- 3D Globe Container -->
+    <div id="globe-container"></div>
+    
+    <!-- Radar Sweep Overlay (Static visual effect) -->
+    <div class="radar-lines"></div>
+
+    <!-- UI Overlay Dashboard -->
+    <div id="dashboard" class="glass-panel">
+        <header>
+            <div class="logo-area">
+                <i class="fa-solid fa-satellite-dish pulse-glow"></i>
+                <div class="logo-text">
+                    <h1>AETHER</h1>
+                    <span>CELESTIAL RADAR SYSTEM</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-label">LOADED</span>
+                <span id="stat-total" class="stat-value">0</span>
+            </div>
+            <div class="stat-card highlighted">
+                <span class="stat-label">ABOVE ME</span>
+                <span id="stat-above" class="stat-value neon-green">0</span>
+            </div>
+        </div>
+
+        <!-- Location Controls -->
+        <section class="dashboard-section">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-location-crosshairs text-blue"></i> OBSERVER SITE</h2>
+                <span id="location-status" class="status-badge gps-off">DISCONNECTED</span>
+            </div>
+            
+            <div class="location-display glass-sub-card">
+                <div class="loc-coord">
+                    <span class="coord-label">LAT</span>
+                    <span id="display-lat" class="coord-val font-mono">0.0000° N</span>
+                </div>
+                <div class="loc-coord">
+                    <span class="coord-label">LNG</span>
+                    <span id="display-lng" class="coord-val font-mono">0.0000° E</span>
+                </div>
+            </div>
+
+            <div class="location-controls">
+                <button id="btn-gps" class="btn btn-primary btn-sm">
+                    <i class="fa-solid fa-gps"></i> Use GPS Location
+                </button>
+                <button id="btn-toggle-manual" class="btn btn-secondary btn-sm">
+                    <i class="fa-solid fa-sliders"></i> Adjust Site
+                </button>
+            </div>
+
+            <!-- Manual Coordinates Input (Collapsed by default) -->
+            <div id="manual-coords-form" class="coords-form collapsed">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="input-lat">Latitude (°)</label>
+                        <input type="number" id="input-lat" step="0.0001" min="-90" max="90" value="51.5074">
+                    </div>
+                    <div class="form-group">
+                        <label for="input-lng">Longitude (°)</label>
+                        <input type="number" id="input-lng" step="0.0001" min="-180" max="180" value="-0.1278">
+                    </div>
+                </div>
+                <button id="btn-apply-coords" class="btn btn-accent btn-block btn-sm">
+                    Apply Location
+                </button>
+            </div>
+        </section>
+
+        <!-- Configuration Panel -->
+        <section class="dashboard-section">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-bars-filter text-blue"></i> FILTER & GROUP</h2>
+            </div>
+            
+            <div class="form-group">
+                <div class="select-wrapper">
+                    <select id="select-group">
+                        <option value="stations">🛰️ Space Stations (ISS / Tiangong)</option>
+                        <option value="visual" selected>✨ Visible / Bright Satellites</option>
+                        <option value="gps">📡 GPS Satellites</option>
+                        <option value="weather">🌦️ Weather & Meteorology</option>
+                        <option value="starlink">🛸 Starlink Constellation</option>
+                        <option value="science">🔬 Scientific / Space Physics</option>
+                        <option value="geo">🌌 Geostationary Satellites</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="search-box">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" id="search-input" placeholder="Search satellite by name or ID...">
+            </div>
+        </section>
+
+        <!-- Satellites Above Me List -->
+        <section class="dashboard-section list-section">
+            <div class="section-header">
+                <h2><i class="fa-solid fa-eye text-green"></i> PASSING OVERHEAD</h2>
+                <span class="sub-heading">Sorted by highest elevation</span>
+            </div>
+            <div id="satellite-list" class="satellite-list-container">
+                <div class="empty-list-message">
+                    <i class="fa-solid fa-satellite fa-fade"></i>
+                    <p>No satellites detected overhead yet. Change location or group.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Live Telemetry / Details Panel (Hidden by default, slides in from right) -->
+    <div id="details-panel" class="glass-panel side-panel hidden">
+        <button id="btn-close-details" class="close-btn"><i class="fa-solid fa-xmark"></i></button>
+        
+        <div class="details-header">
+            <i class="fa-solid fa-satellite-dish sat-icon-lg"></i>
+            <div class="sat-title-group">
+                <h3 id="details-name" class="sat-name">ISS (ZARYA)</h3>
+                <span class="sat-id">NORAD ID: <span id="details-id" class="font-mono">25544</span></span>
+            </div>
+        </div>
+
+        <!-- Telemetry Data Cards -->
+        <div class="telemetry-grid">
+            <div class="tel-card col-span-2">
+                <span class="tel-label">STATUS</span>
+                <span id="details-visibility" class="tel-value font-mono">BELOW HORIZON</span>
+            </div>
+            
+            <div class="tel-card">
+                <span class="tel-label">ELEVATION</span>
+                <span id="details-elevation" class="tel-value font-mono neon-blue">--.-°</span>
+            </div>
+            <div class="tel-card">
+                <span class="tel-label">AZIMUTH</span>
+                <span id="details-azimuth" class="tel-value font-mono">---.-°</span>
+            </div>
+            
+            <div class="tel-card">
+                <span class="tel-label">ALTITUDE</span>
+                <span id="details-altitude" class="tel-value font-mono">--- km</span>
+            </div>
+            <div class="tel-card">
+                <span class="tel-label">VELOCITY</span>
+                <span id="details-velocity" class="tel-value font-mono">--.- km/s</span>
+            </div>
+
+            <div class="tel-card">
+                <span class="tel-label">RANGE</span>
+                <span id="details-range" class="tel-value font-mono">---- km</span>
+            </div>
+            <div class="tel-card">
+                <span class="tel-label">LATITUDE</span>
+                <span id="details-lat" class="tel-value font-mono">--.---°</span>
+            </div>
+            <div class="tel-card">
+                <span class="tel-label">LONGITUDE</span>
+                <span id="details-lng" class="tel-value font-mono">--.---°</span>
+            </div>
+            <div class="tel-card">
+                <span class="tel-label">PERIOD</span>
+                <span id="details-period" class="tel-value font-mono">--.- min</span>
+            </div>
+        </div>
+
+        <!-- Satellite Controls -->
+        <div class="details-actions">
+            <button id="btn-flyto" class="btn btn-primary">
+                <i class="fa-solid fa-crosshairs"></i> Fly to Satellite
+            </button>
+            <button id="btn-track" class="btn btn-secondary">
+                <i class="fa-solid fa-lock"></i> Track Orbit
+            </button>
+            <button id="btn-orbit-path" class="btn btn-secondary active">
+                <i class="fa-solid fa-route"></i> Toggle Path
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loader-content">
+            <div class="loader-ring">
+                <span></span>
+            </div>
+            <div class="loader-text">
+                <h3 class="pulse-text">INITIATING AETHER</h3>
+                <p id="loading-status">Connecting to tracking server...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Notification (Top Right toast) -->
+    <div id="toast" class="toast hidden">
+        <i id="toast-icon" class="fa-solid fa-info-circle"></i>
+        <span id="toast-message">Message text</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+</body>
+</html>
