@@ -21,10 +21,11 @@ AETHER is a high-fidelity, real-time 3D web application designed to track artifi
 
 1. Clone or download this repository.
 2. Open a terminal in the project directory.
-3. Start the local server:
+3. Start the local server inside the Conda environment:
    ```bash
-   python server.py
+   conda run -n satellite-tracker python server.py
    ```
+   *(Alternatively, run using your base Python with `python server.py`)*
 4. Open your web browser and visit:
    ```
    http://localhost:8000
